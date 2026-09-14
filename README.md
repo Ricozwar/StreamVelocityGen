@@ -4,6 +4,8 @@ Lokalny generator bannerów kierowców VRCP z pliku CSV. Rysuje overlaye w przeg
 
 **Live:** https://ricozwar.github.io/StreamVelocityGen/
 
+Repo: https://github.com/Ricozwar/StreamVelocityGen
+
 ## Uruchomienie
 
 Wymagane: [Node.js](https://nodejs.org/)
