@@ -1,0 +1,5 @@
+{
+  "name": "StreamVelocity Gen",
+  "description": "Lokalny generator bannerów kierowców VRCP z pliku CSV (Canvas, bez AI).",
+  "requestFramePermissions": []
+}
