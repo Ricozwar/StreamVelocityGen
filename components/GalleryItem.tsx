@@ -44,6 +44,9 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
   const nameLocked = isGenerating;
   const nameDirty =
     isSuccess && (asset.driverName ?? '').trim() !== (asset.generatedName ?? '').trim();
+  const showNumberBadge =
+    Boolean(showCarNumber) ||
+    (asset.source === 'manual' && Boolean((asset.stats.carNumber ?? '').trim()));
 
   const handleDownloadBanner = async () => {
     if (!asset.generatedUrl) return;
@@ -83,13 +86,15 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
             className={`relative transition-all duration-500 ease-in-out ${isSuccess ? 'w-1/3 border-r border-gray-800' : 'w-full'}`}
           >
             <div className="w-full h-full bg-gray-800/80 flex flex-col items-center justify-center gap-1 p-4 text-center">
-              <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">CSV</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">
+                {asset.source === 'manual' ? 'Ręcznie' : 'CSV'}
+              </span>
               <span className="text-sm text-white font-medium truncate w-full">
                 {asset.driverName || 'Kierowca'}
               </span>
               <span className="text-xs text-gray-400">
                 {[
-                  showCarNumber ? `#${asset.stats.carNumber}` : null,
+                  showNumberBadge ? `#${asset.stats.carNumber}` : null,
                   asset.stats.carBrand,
                   asset.stats.classCategory,
                 ]
@@ -182,9 +187,9 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
           />
           <span
             className="text-xs text-gray-400 font-medium truncate max-w-[100px]"
-            title={asset.driverName || 'CSV'}
+            title={asset.driverName || (asset.source === 'manual' ? 'Ręcznie' : 'CSV')}
           >
-            {asset.driverName || 'CSV'}
+            {asset.driverName || (asset.source === 'manual' ? 'Ręcznie' : 'CSV')}
           </span>
         </div>
 

@@ -26,6 +26,7 @@ import {
 } from './services/logoCatalog';
 import { Palette, Wand2, Trash2, Scissors, FileSpreadsheet, Download, Car } from 'lucide-react';
 import { BannerColorPicker } from './components/BannerColorPicker';
+import { ManualBannerForm, type ManualBannerEntry } from './components/ManualBannerForm';
 
 const App: React.FC = () => {
   const [assets, setAssets] = useState<StreamAsset[]>([]);
@@ -63,7 +64,7 @@ const App: React.FC = () => {
     else if (json) table = jsonDriversToTable(json);
 
     if (!table || table.rows.length === 0 || table.headers.length === 0) {
-      setAssets([]);
+      setAssets((prev) => prev.filter((a) => a.source === 'manual'));
       setCsvMap(null);
       return;
     }
@@ -87,6 +88,7 @@ const App: React.FC = () => {
       return {
         id: crypto.randomUUID(),
         status: GenerationStatus.IDLE,
+        source: 'csv',
         driverName: driverName || undefined,
         carBrand: carBrand !== 'RACING' ? carBrand : undefined,
         stats,
@@ -94,7 +96,7 @@ const App: React.FC = () => {
       };
     });
     setCsvMap(columns);
-    setAssets(newAssets);
+    setAssets((prev) => [...prev.filter((a) => a.source === 'manual'), ...newAssets]);
   }, []);
 
   const loadFiles = useCallback(
@@ -213,28 +215,38 @@ const App: React.FC = () => {
 
   const handleGenerate = useCallback(
     async (assetToProcess: StreamAsset) => {
-      setAssets((prev) =>
-        prev.map((a) =>
+      setAssets((prev) => {
+        const exists = prev.some((a) => a.id === assetToProcess.id);
+        if (!exists) {
+          return [
+            { ...assetToProcess, status: GenerationStatus.LOADING, errorMessage: undefined },
+            ...prev,
+          ];
+        }
+        return prev.map((a) =>
           a.id === assetToProcess.id
             ? { ...a, status: GenerationStatus.LOADING, errorMessage: undefined }
             : a
-        )
-      );
+        );
+      });
 
       try {
-        const stats = { ...assetToProcess.stats };
-        if (assetToProcess.carBrand?.trim()) {
-          stats.carBrand = assetToProcess.carBrand.trim().toUpperCase();
+        const latest = assetsRef.current.find((a) => a.id === assetToProcess.id) ?? assetToProcess;
+        const stats = { ...latest.stats };
+        if (latest.carBrand?.trim()) {
+          stats.carBrand = latest.carBrand.trim().toUpperCase();
         }
-        if (includeTeamNameFromCsv && assetToProcess.teamName?.trim()) {
-          stats.teamName = assetToProcess.teamName.trim();
+        const teamName = latest.teamName?.trim();
+        if (teamName && (includeTeamNameFromCsv || latest.source === 'manual')) {
+          stats.teamName = teamName;
         } else {
           delete stats.teamName;
         }
-        stats.showCarNumber = configRef.current.showCarNumber;
-        const nameToRender =
-          (assetsRef.current.find((a) => a.id === assetToProcess.id)?.driverName ??
-            assetToProcess.driverName) || 'Kierowca';
+        const carNumber = (stats.carNumber ?? '').trim();
+        stats.showCarNumber =
+          configRef.current.showCarNumber ||
+          (latest.source === 'manual' && carNumber.length > 0);
+        const nameToRender = (latest.driverName ?? '').trim() || 'Kierowca';
         const generatedImage = await generateRacingOverlayFromStats(
           stats,
           nameToRender,
@@ -266,6 +278,27 @@ const App: React.FC = () => {
       }
     },
     [includeTeamNameFromCsv]
+  );
+
+  const handleAddManualBanner = useCallback(
+    (entry: ManualBannerEntry) => {
+      const brand = normalizeBrandKey(entry.carBrand);
+      const asset: StreamAsset = {
+        id: crypto.randomUUID(),
+        status: GenerationStatus.IDLE,
+        source: 'manual',
+        driverName: entry.driverName,
+        carBrand: brand || undefined,
+        teamName: entry.teamName || undefined,
+        stats: {
+          carNumber: entry.carNumber,
+          carBrand: brand || 'RACING',
+          classCategory: entry.classCategory,
+        },
+      };
+      void handleGenerate(asset);
+    },
+    [handleGenerate]
   );
 
   const handleRegenerate = useCallback(
@@ -388,7 +421,7 @@ const App: React.FC = () => {
               onFiles={loadFiles}
               disabled={isProcessingQueue}
               fileName={[csvFileName, jsonFileName].filter(Boolean).join(' + ') || null}
-              rowCount={assets.length}
+              rowCount={assets.filter((a) => a.source !== 'manual').length}
               hint={
                 jsonFileName && !csvFileName
                   ? 'Wgraj też CSV z SimGrid, żeby dostać samochód i klasę.'
@@ -398,6 +431,13 @@ const App: React.FC = () => {
                       ? 'Połączono CSV (auto/klasa) z JSON (imię i nazwisko).'
                       : null
               }
+            />
+
+            <ManualBannerForm
+              brands={logoBrands}
+              disabled={isDownloadingAll}
+              onUploadLogo={handleUploadLogo}
+              onAdd={handleAddManualBanner}
             />
 
             {csvMap && (
@@ -552,7 +592,7 @@ const App: React.FC = () => {
                     </>
                   ) : (
                     <div className="rounded-lg border border-dashed border-gray-700 bg-gray-950/50 px-4 py-3 text-sm text-gray-500">
-                      Najpierw wgraj CSV lub JSON po lewej — tu pojawią się pola do wyboru nazwiska.
+                      Wgraj CSV/JSON po lewej, żeby wybrać pola nazwiska — albo dodaj kierowcę ręcznie.
                     </div>
                   )}
                 </div>
@@ -563,7 +603,10 @@ const App: React.FC = () => {
                   </label>
                   <BannerColorPicker
                     colors={config.colors}
-                    showNumber={config.showCarNumber}
+                    showNumber={
+                      config.showCarNumber ||
+                      assets.some((a) => a.source === 'manual' && Boolean(a.stats.carNumber?.trim()))
+                    }
                     disabled={isProcessingQueue || isDownloadingAll}
                     onChange={(colors) => applyBannerColors(colors, false)}
                     onPreset={(colors) => applyBannerColors(colors, true)}
@@ -660,7 +703,7 @@ const App: React.FC = () => {
                 <GalleryItem
                   asset={asset}
                   logoBrands={logoBrands}
-                  showTeamInput={includeTeamNameFromCsv}
+                  showTeamInput={includeTeamNameFromCsv || asset.source === 'manual'}
                   showCarNumber={config.showCarNumber}
                   onRetry={() => handleRegenerate(asset.id)}
                   onReset={handleResetAsset}
@@ -681,7 +724,9 @@ const App: React.FC = () => {
                 <FileSpreadsheet className="w-12 h-12 text-gray-600" />
               </div>
               <p className="text-xl text-gray-500">Brak listy kierowców.</p>
-              <p className="text-sm text-gray-600">Wgraj CSV i/lub JSON z SimGrid, żeby wygenerować banery.</p>
+              <p className="text-sm text-gray-600">
+                Dodaj kierowcę ręcznie po lewej albo wgraj CSV i/lub JSON z SimGrid.
+              </p>
             </div>
           )}
         </div>

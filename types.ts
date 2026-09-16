@@ -31,6 +31,7 @@ export interface StreamAsset {
   stats: OverlayStats;
   teamName?: string;
   csvRow?: string[];
+  source?: 'csv' | 'manual';
 }
 
 export interface GeneratorConfig {
