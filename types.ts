@@ -26,12 +26,15 @@ export interface OverlayStats {
 export interface StreamAsset {
   id: string;
   driverName?: string;
+  /** Name baked into the last generated banner (for dirty/save). */
+  generatedName?: string;
   carBrand?: string;
   generatedUrl?: string;
   status: GenerationStatus;
   errorMessage?: string;
   stats: OverlayStats;
   teamName?: string;
+  csvRow?: string[];
 }
 
 export interface GeneratorConfig {
@@ -39,12 +42,13 @@ export interface GeneratorConfig {
 }
 
 export interface CsvColumnMap {
-  nameCol: number;
+  nameCols: number[];
   numCol: number;
   brandCol: number;
   classCol: number;
-  nameHeader: string;
+  nameHeaders: string[];
   numHeader: string;
   brandHeader: string;
   classHeader: string | null;
+  headers: string[];
 }

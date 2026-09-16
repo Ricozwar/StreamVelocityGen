@@ -62,15 +62,24 @@ export function getCsvColumnIndices(headers: string[]): CsvColumnMap {
   if (classCol < 0) classCol = find('klasa', 'class', 'kategoria');
 
   return {
-    nameCol,
+    nameCols: [nameCol],
     numCol,
     brandCol,
     classCol,
-    nameHeader: headers[nameCol] ?? '—',
+    nameHeaders: [headers[nameCol] ?? 'real name'],
     numHeader: headers[numCol] ?? '—',
     brandHeader: headers[brandCol] ?? '—',
     classHeader: classCol >= 0 ? (headers[classCol] ?? null) : null,
+    headers,
   };
+}
+
+/** Join selected CSV cells into a banner name, skipping blanks. */
+export function composeDriverName(row: string[], nameCols: number[]): string {
+  return nameCols
+    .map((i) => (row[i] ?? '').trim())
+    .filter((cell) => cell.length > 0)
+    .join(' ');
 }
 
 /** First token of car name, e.g. "Lamborghini Huracan GT3 Evo2" -> "LAMBORGHINI". */

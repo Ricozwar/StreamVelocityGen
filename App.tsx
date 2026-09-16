@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Header } from './components/Header';
 import { CsvDropzone } from './components/CsvDropzone';
 import { GalleryItem } from './components/GalleryItem';
@@ -11,7 +11,7 @@ import {
   CsvColumnMap,
 } from './types';
 import type { ParsedCSV } from './services/csvParser';
-import { parseCSV, getCsvColumnIndices, brandFromCarName } from './services/csvParser';
+import { parseCSV, getCsvColumnIndices, brandFromCarName, composeDriverName } from './services/csvParser';
 import { generateRacingOverlayFromStats, getAvailableLogoBrands } from './services/bannerService';
 import { downloadAllBanners } from './services/bannerDownload';
 import { Palette, Wand2, Trash2, Scissors, FileSpreadsheet, Download } from 'lucide-react';
@@ -26,6 +26,8 @@ const App: React.FC = () => {
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [csvMap, setCsvMap] = useState<CsvColumnMap | null>(null);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const assetsRef = useRef<StreamAsset[]>([]);
+  assetsRef.current = assets;
 
   const loadCsvFile = useCallback(async (file: File) => {
     try {
@@ -36,7 +38,7 @@ const App: React.FC = () => {
       }
       const columns = getCsvColumnIndices(parsed.headers);
       const newAssets: StreamAsset[] = parsed.rows.map((row) => {
-        const driverName = (row[columns.nameCol] ?? '').trim();
+        const driverName = composeDriverName(row, columns.nameCols);
         const carNumber = (row[columns.numCol] ?? '').trim() || '0';
         const carNameCell = (row[columns.brandCol] ?? '').trim();
         const carBrand = carNameCell ? brandFromCarName(carNameCell) : 'RACING';
@@ -50,6 +52,7 @@ const App: React.FC = () => {
           driverName: driverName || undefined,
           carBrand: carBrand !== 'RACING' ? carBrand : undefined,
           stats,
+          csvRow: row,
         };
       });
       setCsvFileName(file.name);
@@ -58,6 +61,36 @@ const App: React.FC = () => {
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Błąd odczytu CSV.');
     }
+  }, []);
+
+  const handleNameColsChange = useCallback((colIndex: number, checked: boolean) => {
+    setCsvMap((prev) => {
+      if (!prev) return prev;
+      if (!checked && prev.nameCols.length <= 1 && prev.nameCols.includes(colIndex)) {
+        return prev;
+      }
+      let nameCols = checked
+        ? [...prev.nameCols, colIndex]
+        : prev.nameCols.filter((i) => i !== colIndex);
+      nameCols = [...new Set(nameCols)].sort((a, b) => a - b);
+      const nameHeaders = nameCols.map((i) => prev.headers[i] ?? `Kolumna ${i + 1}`);
+      const next = { ...prev, nameCols, nameHeaders };
+      setAssets((assetsPrev) =>
+        assetsPrev.map((a) => {
+          if (!a.csvRow) return a;
+          const driverName = composeDriverName(a.csvRow, nameCols) || undefined;
+          const wasGenerated = a.status === GenerationStatus.SUCCESS;
+          return {
+            ...a,
+            driverName,
+            ...(wasGenerated
+              ? {}
+              : { status: GenerationStatus.IDLE, generatedUrl: undefined, generatedName: undefined }),
+          };
+        })
+      );
+      return next;
+    });
   }, []);
 
   const handleUpdateName = useCallback((id: string, name: string) => {
@@ -88,7 +121,7 @@ const App: React.FC = () => {
     setAssets((prev) =>
       prev.map((a) =>
         a.id === id
-          ? { ...a, status: GenerationStatus.IDLE, generatedUrl: undefined, errorMessage: undefined }
+          ? { ...a, status: GenerationStatus.IDLE, generatedUrl: undefined, generatedName: undefined, errorMessage: undefined }
           : a
       )
     );
@@ -114,16 +147,24 @@ const App: React.FC = () => {
         } else {
           delete stats.teamName;
         }
+        const nameToRender =
+          (assetsRef.current.find((a) => a.id === assetToProcess.id)?.driverName ??
+            assetToProcess.driverName) || 'Kierowca';
         const generatedImage = await generateRacingOverlayFromStats(
           stats,
-          assetToProcess.driverName ?? 'Kierowca',
+          nameToRender,
           config.style
         );
 
         setAssets((prev) =>
           prev.map((a) =>
             a.id === assetToProcess.id
-              ? { ...a, status: GenerationStatus.SUCCESS, generatedUrl: generatedImage }
+              ? {
+                  ...a,
+                  status: GenerationStatus.SUCCESS,
+                  generatedUrl: generatedImage,
+                  generatedName: nameToRender,
+                }
               : a
           )
         );
@@ -141,11 +182,23 @@ const App: React.FC = () => {
     [config, includeTeamNameFromCsv]
   );
 
+  const handleRegenerate = useCallback(
+    async (id: string) => {
+      const current = assetsRef.current.find((a) => a.id === id);
+      if (current) await handleGenerate(current);
+    },
+    [handleGenerate]
+  );
+
   const handleGenerateAll = useCallback(async () => {
     setIsProcessingQueue(true);
-    const idleAssets = assets.filter(
-      (a) => a.status === GenerationStatus.IDLE || a.status === GenerationStatus.ERROR
-    );
+    const idleAssets = assets.filter((a) => {
+      if (a.status === GenerationStatus.IDLE || a.status === GenerationStatus.ERROR) return true;
+      if (a.status === GenerationStatus.SUCCESS) {
+        return (a.driverName ?? '').trim() !== (a.generatedName ?? '').trim();
+      }
+      return false;
+    });
 
     const BATCH_SIZE = 4;
 
@@ -167,9 +220,13 @@ const App: React.FC = () => {
     setCsvMap(null);
   };
 
-  const readyCount = assets.filter(
-    (a) => a.status === GenerationStatus.IDLE || a.status === GenerationStatus.ERROR
-  ).length;
+  const readyCount = assets.filter((a) => {
+    if (a.status === GenerationStatus.IDLE || a.status === GenerationStatus.ERROR) return true;
+    if (a.status === GenerationStatus.SUCCESS) {
+      return (a.driverName ?? '').trim() !== (a.generatedName ?? '').trim();
+    }
+    return false;
+  }).length;
   const generatedCount = assets.filter(
     (a) => a.status === GenerationStatus.SUCCESS && a.generatedUrl
   ).length;
@@ -202,21 +259,48 @@ const App: React.FC = () => {
             />
 
             {csvMap && (
-              <div className="rounded-lg border border-gray-800 bg-gray-950/60 p-4 text-xs text-gray-400 space-y-1">
-                <p className="text-gray-300 font-medium mb-2">Rozpoznane kolumny</p>
-                <p>
-                  Kierowca: <span className="text-white">{csvMap.nameHeader}</span>
-                </p>
-                <p>
-                  Numer: <span className="text-white">{csvMap.numHeader}</span>
-                </p>
-                <p>
-                  Samochód: <span className="text-white">{csvMap.brandHeader}</span>
-                </p>
-                <p>
-                  Klasa:{' '}
-                  <span className="text-white">{csvMap.classHeader ?? 'brak — użyto PRO'}</span>
-                </p>
+              <div className="rounded-lg border border-gray-800 bg-gray-950/60 p-4 text-xs text-gray-400 space-y-3">
+                <div>
+                  <p className="text-gray-300 font-medium mb-1">Imię i nazwisko na banerze</p>
+                  <p className="text-gray-500 mb-2">
+                    Zaznacz pola CSV. Domyślnie: <span className="text-twitch-300">real name</span>.
+                    Kilka pól składa się w jedną nazwę.
+                  </p>
+                  <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                    {csvMap.headers.map((header, index) => {
+                      const label = header.trim() || `Kolumna ${index + 1}`;
+                      const checked = csvMap.nameCols.includes(index);
+                      return (
+                        <label
+                          key={`${index}-${label}`}
+                          className="flex items-center gap-2 cursor-pointer select-none hover:text-gray-200"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => handleNameColsChange(index, e.target.checked)}
+                            disabled={isProcessingQueue}
+                            className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-900 text-twitch-500 focus:ring-twitch-500"
+                          />
+                          <span className={checked ? 'text-white' : ''}>{label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-1 pt-2 border-t border-gray-800">
+                  <p className="text-gray-300 font-medium mb-1">Pozostałe kolumny</p>
+                  <p>
+                    Numer: <span className="text-white">{csvMap.numHeader}</span>
+                  </p>
+                  <p>
+                    Samochód: <span className="text-white">{csvMap.brandHeader}</span>
+                  </p>
+                  <p>
+                    Klasa:{' '}
+                    <span className="text-white">{csvMap.classHeader ?? 'brak — użyto PRO'}</span>
+                  </p>
+                </div>
               </div>
             )}
 
@@ -352,12 +436,13 @@ const App: React.FC = () => {
                   asset={asset}
                   availableLogoBrands={availableLogoBrands}
                   showTeamInput={includeTeamNameFromCsv}
-                  onRetry={() => handleGenerate(asset)}
+                  onRetry={() => handleRegenerate(asset.id)}
                   onReset={handleResetAsset}
                   onRemove={removeAsset}
                   onUpdateName={handleUpdateName}
                   onUpdateBrand={handleUpdateBrand}
                   onUpdateTeam={handleUpdateTeam}
+                  onSaveName={() => handleRegenerate(asset.id)}
                 />
               </div>
             ))}

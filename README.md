@@ -27,7 +27,7 @@ Wejście: lista zgłoszeń (UTF-8). Rozpoznawane kolumny:
 
 | Dane na banerze | Kolumny |
 | --- | --- |
-| Imię i nazwisko | `real name` (albo kierowca / driver) |
+| Imię i nazwisko | Domyślnie `real name`. Po wczytaniu CSV możesz zaznaczyć inne / kilka pól. Po wygenerowaniu nazwę da się poprawić i **Zapisać** (przerysuje baner). |
 | Numer | `car number` |
 | Marka / logo | `car name` (pierwszy człon, np. Lamborghini) |
 | Klasa | `car class` (gdy brak — PRO) |

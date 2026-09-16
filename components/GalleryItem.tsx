@@ -1,6 +1,6 @@
 import React from 'react';
 import { StreamAsset, GenerationStatus } from '../types';
-import { Loader2, AlertCircle, Scissors, Pencil, RotateCcw, Car, Users } from 'lucide-react';
+import { Loader2, AlertCircle, Scissors, Pencil, RotateCcw, Car, Users, Save } from 'lucide-react';
 import {
   bannerFilename,
   cropBannerToPngBlob,
@@ -17,6 +17,7 @@ interface GalleryItemProps {
   onUpdateName: (id: string, name: string) => void;
   onUpdateBrand: (id: string, brand: string) => void;
   onUpdateTeam?: (id: string, teamName: string) => void;
+  onSaveName?: (id: string) => void;
 }
 
 export const GalleryItem: React.FC<GalleryItemProps> = ({
@@ -29,11 +30,14 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
   onUpdateName,
   onUpdateBrand,
   onUpdateTeam,
+  onSaveName,
 }) => {
   const isGenerating = asset.status === GenerationStatus.LOADING;
   const isSuccess = asset.status === GenerationStatus.SUCCESS;
   const isError = asset.status === GenerationStatus.ERROR;
-  const isIdle = asset.status === GenerationStatus.IDLE || asset.status === GenerationStatus.ERROR;
+  const nameLocked = isGenerating;
+  const nameDirty =
+    isSuccess && (asset.driverName ?? '').trim() !== (asset.generatedName ?? '').trim();
 
   const handleDownloadBanner = async () => {
     if (!asset.generatedUrl) return;
@@ -106,16 +110,35 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
             type="text"
             value={asset.driverName || ''}
             onChange={(e) => onUpdateName(asset.id, e.target.value)}
-            disabled={!isIdle}
+            disabled={nameLocked}
             placeholder="Imię i nazwisko kierowcy"
             className={`
                     w-full bg-gray-900 text-sm text-white border border-gray-800 rounded-md py-2 pl-9 pr-8
                     focus:outline-none focus:ring-1 focus:ring-twitch-500 focus:border-twitch-500
                     placeholder-gray-600 transition-colors
-                    ${!isIdle ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-700'}
+                    ${nameLocked ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-700'}
+                    ${nameDirty ? 'border-twitch-500/60' : ''}
                 `}
           />
         </div>
+        {isSuccess && onSaveName && (
+          <button
+            type="button"
+            onClick={() => onSaveName(asset.id)}
+            disabled={nameLocked || !nameDirty}
+            className={`
+              w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-semibold transition-colors
+              ${
+                nameDirty
+                  ? 'bg-twitch-600 hover:bg-twitch-500 text-white'
+                  : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+              }
+            `}
+          >
+            <Save className="w-3 h-3" />
+            {nameDirty ? 'Zapisz i przerysuj baner' : 'Zapisane'}
+          </button>
+        )}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Car className="h-3 w-3 text-gray-500" />
@@ -123,12 +146,12 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
           <select
             value={asset.carBrand || ''}
             onChange={(e) => onUpdateBrand(asset.id, e.target.value)}
-            disabled={!isIdle}
+            disabled={nameLocked || isSuccess}
             className={`
                     w-full bg-gray-900 text-sm text-white border border-gray-800 rounded-md py-2 pl-9 pr-8
                     focus:outline-none focus:ring-1 focus:ring-twitch-500 focus:border-twitch-500
                     transition-colors appearance-none cursor-pointer
-                    ${!isIdle ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-700'}
+                    ${nameLocked || isSuccess ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-700'}
                 `}
           >
             <option value="">Wybierz markę (logo)</option>
@@ -153,7 +176,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               type="text"
               value={asset.teamName ?? ''}
               onChange={(e) => onUpdateTeam(asset.id, e.target.value)}
-              disabled={!isIdle}
+              disabled={nameLocked || isSuccess}
               placeholder="Nazwa teamu"
               className="w-full bg-gray-900 text-sm text-white border border-gray-800 rounded-md py-2 pl-9 pr-2 focus:outline-none focus:ring-1 focus:ring-twitch-500 focus:border-twitch-500 placeholder-gray-600 hover:border-gray-700"
             />
