@@ -259,48 +259,18 @@ const App: React.FC = () => {
             />
 
             {csvMap && (
-              <div className="rounded-lg border border-gray-800 bg-gray-950/60 p-4 text-xs text-gray-400 space-y-3">
-                <div>
-                  <p className="text-gray-300 font-medium mb-1">Imię i nazwisko na banerze</p>
-                  <p className="text-gray-500 mb-2">
-                    Zaznacz pola CSV. Domyślnie: <span className="text-twitch-300">real name</span>.
-                    Kilka pól składa się w jedną nazwę.
-                  </p>
-                  <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
-                    {csvMap.headers.map((header, index) => {
-                      const label = header.trim() || `Kolumna ${index + 1}`;
-                      const checked = csvMap.nameCols.includes(index);
-                      return (
-                        <label
-                          key={`${index}-${label}`}
-                          className="flex items-center gap-2 cursor-pointer select-none hover:text-gray-200"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => handleNameColsChange(index, e.target.checked)}
-                            disabled={isProcessingQueue}
-                            className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-900 text-twitch-500 focus:ring-twitch-500"
-                          />
-                          <span className={checked ? 'text-white' : ''}>{label}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="space-y-1 pt-2 border-t border-gray-800">
-                  <p className="text-gray-300 font-medium mb-1">Pozostałe kolumny</p>
-                  <p>
-                    Numer: <span className="text-white">{csvMap.numHeader}</span>
-                  </p>
-                  <p>
-                    Samochód: <span className="text-white">{csvMap.brandHeader}</span>
-                  </p>
-                  <p>
-                    Klasa:{' '}
-                    <span className="text-white">{csvMap.classHeader ?? 'brak — użyto PRO'}</span>
-                  </p>
-                </div>
+              <div className="rounded-lg border border-gray-800 bg-gray-950/60 p-4 text-xs text-gray-400 space-y-1">
+                <p className="text-gray-300 font-medium mb-1">Rozpoznane kolumny</p>
+                <p>
+                  Numer: <span className="text-white">{csvMap.numHeader}</span>
+                </p>
+                <p>
+                  Samochód: <span className="text-white">{csvMap.brandHeader}</span>
+                </p>
+                <p>
+                  Klasa:{' '}
+                  <span className="text-white">{csvMap.classHeader ?? 'brak — użyto PRO'}</span>
+                </p>
               </div>
             )}
 
@@ -327,6 +297,49 @@ const App: React.FC = () => {
               </h2>
 
               <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+                    Pola CSV na imię i nazwisko
+                  </label>
+                  {csvMap ? (
+                    <>
+                      <p className="text-xs text-gray-500">
+                        Domyślnie zaznaczone jest <span className="text-twitch-300">real name</span>.
+                        Możesz wybrać kilka pól — złożą się w jedną nazwę na banerze.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto rounded-lg border border-gray-700 bg-gray-950 p-3">
+                        {csvMap.headers.map((header, index) => {
+                          const label = header.trim() || `Kolumna ${index + 1}`;
+                          const checked = csvMap.nameCols.includes(index);
+                          return (
+                            <label
+                              key={`${index}-${label}`}
+                              className={`flex items-center gap-2 cursor-pointer select-none rounded-md px-2 py-1.5 text-sm ${
+                                checked ? 'bg-twitch-900/40 text-white' : 'text-gray-300 hover:bg-gray-900'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => handleNameColsChange(index, e.target.checked)}
+                                disabled={isProcessingQueue}
+                                className="w-4 h-4 rounded border-gray-600 bg-gray-900 text-twitch-500 focus:ring-twitch-500"
+                              />
+                              <span className="truncate" title={label}>
+                                {label}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-gray-700 bg-gray-950/50 px-4 py-3 text-sm text-gray-500">
+                      Najpierw wgraj CSV po lewej — tu pojawią się wszystkie kolumny do wyboru nazwiska.
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">
                     Styl
