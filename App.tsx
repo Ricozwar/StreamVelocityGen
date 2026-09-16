@@ -43,8 +43,10 @@ const App: React.FC = () => {
   const jsonDriversRef = useRef<JsonDriver[] | null>(null);
   const [logoBrands, setLogoBrands] = useState<LogoBrand[]>([]);
   const logoBrandsRef = useRef<LogoBrand[]>([]);
+  const configRef = useRef(config);
   assetsRef.current = assets;
   logoBrandsRef.current = logoBrands;
+  configRef.current = config;
 
   useEffect(() => {
     void loadLogoCatalog().then(setLogoBrands);
@@ -227,14 +229,14 @@ const App: React.FC = () => {
         } else {
           delete stats.teamName;
         }
-        stats.showCarNumber = config.showCarNumber;
+        stats.showCarNumber = configRef.current.showCarNumber;
         const nameToRender =
           (assetsRef.current.find((a) => a.id === assetToProcess.id)?.driverName ??
             assetToProcess.driverName) || 'Kierowca';
         const generatedImage = await generateRacingOverlayFromStats(
           stats,
           nameToRender,
-          config.style,
+          configRef.current.style,
           logoBrandsRef.current
         );
 
@@ -261,7 +263,7 @@ const App: React.FC = () => {
         );
       }
     },
-    [config, includeTeamNameFromCsv]
+    [includeTeamNameFromCsv]
   );
 
   const handleRegenerate = useCallback(
@@ -271,6 +273,22 @@ const App: React.FC = () => {
     },
     [handleGenerate]
   );
+
+  const regenerateDrawnBanners = useCallback(async () => {
+    const list = assetsRef.current.filter(
+      (a) =>
+        a.status === GenerationStatus.SUCCESS ||
+        a.status === GenerationStatus.ERROR ||
+        Boolean(a.generatedUrl)
+    );
+    if (list.length === 0) return;
+    setIsProcessingQueue(true);
+    const BATCH_SIZE = 4;
+    for (let i = 0; i < list.length; i += BATCH_SIZE) {
+      await Promise.all(list.slice(i, i + BATCH_SIZE).map((asset) => handleGenerate(asset)));
+    }
+    setIsProcessingQueue(false);
+  }, [handleGenerate]);
 
   const handleGenerateAll = useCallback(async () => {
     setIsProcessingQueue(true);
@@ -427,19 +445,10 @@ const App: React.FC = () => {
                 checked={config.showCarNumber}
                 onChange={(e) => {
                   const checked = e.target.checked;
-                  setConfig((prev) => ({ ...prev, showCarNumber: checked }));
-                  setAssets((prev) =>
-                    prev.map((a) =>
-                      a.status === GenerationStatus.SUCCESS
-                        ? {
-                            ...a,
-                            status: GenerationStatus.IDLE,
-                            generatedUrl: undefined,
-                            generatedName: undefined,
-                          }
-                        : a
-                    )
-                  );
+                  const next = { ...configRef.current, showCarNumber: checked };
+                  configRef.current = next;
+                  setConfig(next);
+                  void regenerateDrawnBanners();
                 }}
                 disabled={isProcessingQueue}
                 className="w-4 h-4 rounded border-gray-600 bg-gray-900 text-twitch-500 focus:ring-twitch-500"
@@ -531,9 +540,13 @@ const App: React.FC = () => {
                   </label>
                   <select
                     value={config.style}
-                    onChange={(e) =>
-                      setConfig((prev) => ({ ...prev, style: e.target.value as RacingStyle }))
-                    }
+                    onChange={(e) => {
+                      const style = e.target.value as RacingStyle;
+                      const next = { ...configRef.current, style };
+                      configRef.current = next;
+                      setConfig(next);
+                      void regenerateDrawnBanners();
+                    }}
                     className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-twitch-500 focus:border-transparent outline-none transition-all appearance-none cursor-pointer hover:border-gray-600"
                     disabled={isProcessingQueue || isDownloadingAll}
                   >
