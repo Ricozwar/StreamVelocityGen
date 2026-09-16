@@ -2,27 +2,35 @@ import React, { useRef } from 'react';
 import { FileSpreadsheet, Upload } from 'lucide-react';
 
 interface CsvDropzoneProps {
-  onFile: (file: File) => void;
+  onFiles: (files: File[]) => void;
   disabled?: boolean;
   fileName?: string | null;
   rowCount?: number;
+  hint?: string | null;
+}
+
+function isListFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return name.endsWith('.csv') || name.endsWith('.json');
 }
 
 export const CsvDropzone: React.FC<CsvDropzoneProps> = ({
-  onFile,
+  onFiles,
   disabled,
   fileName,
   rowCount,
+  hint,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const acceptFile = (file: File | undefined) => {
-    if (!file || disabled) return;
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      alert('Wybierz plik CSV.');
+  const acceptFiles = (list: FileList | null) => {
+    if (!list || disabled) return;
+    const files = Array.from(list).filter(isListFile);
+    if (files.length === 0) {
+      alert('Wybierz plik CSV lub JSON z SimGrid.');
       return;
     }
-    onFile(file);
+    onFiles(files);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -33,11 +41,11 @@ export const CsvDropzone: React.FC<CsvDropzoneProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    acceptFile(e.dataTransfer.files?.[0]);
+    acceptFiles(e.dataTransfer.files);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    acceptFile(e.target.files?.[0]);
+    acceptFiles(e.target.files);
     e.target.value = '';
   };
 
@@ -58,7 +66,8 @@ export const CsvDropzone: React.FC<CsvDropzoneProps> = ({
       <input
         ref={inputRef}
         type="file"
-        accept=".csv,text/csv"
+        accept=".csv,.json,text/csv,application/json"
+        multiple
         className="hidden"
         onChange={handleChange}
         disabled={disabled}
@@ -75,13 +84,13 @@ export const CsvDropzone: React.FC<CsvDropzoneProps> = ({
           />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-white mb-1">Upuść plik CSV tutaj</h3>
-          <p className="text-sm text-gray-400">albo kliknij, żeby wybrać entry list</p>
+          <h3 className="text-lg font-semibold text-white mb-1">Upuść CSV i/lub JSON</h3>
+          <p className="text-sm text-gray-400">SimGrid entry list — możesz wrzucić oba naraz</p>
         </div>
         {fileName ? (
-          <div className="flex items-center gap-2 text-xs text-twitch-300 bg-twitch-900/30 px-3 py-1 rounded-full">
-            <FileSpreadsheet className="w-3 h-3" />
-            <span>
+          <div className="flex items-center gap-2 text-xs text-twitch-300 bg-twitch-900/30 px-3 py-1 rounded-full max-w-full">
+            <FileSpreadsheet className="w-3 h-3 shrink-0" />
+            <span className="truncate">
               {fileName}
               {typeof rowCount === 'number' ? ` · ${rowCount} kierowców` : ''}
             </span>
@@ -89,9 +98,10 @@ export const CsvDropzone: React.FC<CsvDropzoneProps> = ({
         ) : (
           <div className="flex items-center gap-2 text-xs text-gray-500 bg-black/20 px-3 py-1 rounded-full">
             <FileSpreadsheet className="w-3 h-3" />
-            <span>real name, car number, car name, car class</span>
+            <span>CSV: auto / klasa · JSON: imię i nazwisko</span>
           </div>
         )}
+        {hint ? <p className="text-xs text-amber-400/90 max-w-sm">{hint}</p> : null}
       </div>
     </div>
   );

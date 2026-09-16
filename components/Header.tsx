@@ -13,7 +13,7 @@ export const Header: React.FC = () => {
             <h1 className="text-xl font-bold text-white tracking-tight">
               StreamVelocity <span className="text-twitch-400">Gen</span>
             </h1>
-            <p className="text-xs text-gray-400 font-medium">Banery kierowców z CSV</p>
+            <p className="text-xs text-gray-400 font-medium">Banery kierowców z CSV / JSON</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">

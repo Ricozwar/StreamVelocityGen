@@ -12,6 +12,8 @@ import {
 } from './types';
 import type { ParsedCSV } from './services/csvParser';
 import { parseCSV, getCsvColumnIndices, brandFromCarName, composeDriverName } from './services/csvParser';
+import type { JsonDriver } from './services/jsonParser';
+import { parseEntrylistJson, jsonDriversToTable, applyJsonNamesToCsv } from './services/jsonParser';
 import { generateRacingOverlayFromStats, getAvailableLogoBrands } from './services/bannerService';
 import { downloadAllBanners } from './services/bannerDownload';
 import { Palette, Wand2, Trash2, Scissors, FileSpreadsheet, Download } from 'lucide-react';
@@ -24,44 +26,82 @@ const App: React.FC = () => {
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const [includeTeamNameFromCsv, setIncludeTeamNameFromCsv] = useState(false);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
+  const [jsonFileName, setJsonFileName] = useState<string | null>(null);
   const [csvMap, setCsvMap] = useState<CsvColumnMap | null>(null);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const assetsRef = useRef<StreamAsset[]>([]);
+  const csvParsedRef = useRef<ParsedCSV | null>(null);
+  const jsonDriversRef = useRef<JsonDriver[] | null>(null);
   assetsRef.current = assets;
 
-  const loadCsvFile = useCallback(async (file: File) => {
-    try {
-      const parsed: ParsedCSV = await parseCSV(file);
-      if (parsed.rows.length === 0 || parsed.headers.length === 0) {
-        alert('CSV jest pusty lub nie ma nagłówków.');
-        return;
-      }
-      const columns = getCsvColumnIndices(parsed.headers);
-      const newAssets: StreamAsset[] = parsed.rows.map((row) => {
-        const driverName = composeDriverName(row, columns.nameCols);
-        const carNumber = (row[columns.numCol] ?? '').trim() || '0';
-        const carNameCell = (row[columns.brandCol] ?? '').trim();
-        const carBrand = carNameCell ? brandFromCarName(carNameCell) : 'RACING';
-        const classRaw =
-          columns.classCol >= 0 ? (row[columns.classCol] ?? '').trim() : '';
-        const classCategory = (classRaw || 'PRO').toUpperCase();
-        const stats: OverlayStats = { carNumber, carBrand, classCategory };
-        return {
-          id: crypto.randomUUID(),
-          status: GenerationStatus.IDLE,
-          driverName: driverName || undefined,
-          carBrand: carBrand !== 'RACING' ? carBrand : undefined,
-          stats,
-          csvRow: row,
-        };
-      });
-      setCsvFileName(file.name);
-      setCsvMap(columns);
-      setAssets(newAssets);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Błąd odczytu CSV.');
+  const rebuildAssets = useCallback(() => {
+    const csv = csvParsedRef.current;
+    const json = jsonDriversRef.current;
+    let table: ParsedCSV | null = null;
+    if (csv && json) table = applyJsonNamesToCsv(csv, json);
+    else if (csv) table = csv;
+    else if (json) table = jsonDriversToTable(json);
+
+    if (!table || table.rows.length === 0 || table.headers.length === 0) {
+      setAssets([]);
+      setCsvMap(null);
+      return;
     }
+
+    const columns = getCsvColumnIndices(table.headers);
+    const headersNorm = table.headers.map((h) => h.toLowerCase());
+    const fallbackNameCols = [
+      headersNorm.findIndex((c) => c.includes('real name')),
+      headersNorm.findIndex((c) => c === 'username'),
+    ].filter((i) => i >= 0);
+    const newAssets: StreamAsset[] = table.rows.map((row) => {
+      const driverName =
+        composeDriverName(row, columns.nameCols) || composeDriverName(row, fallbackNameCols);
+      const carNumber =
+        columns.numCol >= 0 ? (row[columns.numCol] ?? '').trim() || '0' : '0';
+      const carNameCell = (row[columns.brandCol] ?? '').trim();
+      const carBrand = carNameCell ? brandFromCarName(carNameCell) : 'RACING';
+      const classRaw = columns.classCol >= 0 ? (row[columns.classCol] ?? '').trim() : '';
+      const classCategory = (classRaw || 'PRO').toUpperCase();
+      const stats: OverlayStats = { carNumber, carBrand, classCategory };
+      return {
+        id: crypto.randomUUID(),
+        status: GenerationStatus.IDLE,
+        driverName: driverName || undefined,
+        carBrand: carBrand !== 'RACING' ? carBrand : undefined,
+        stats,
+        csvRow: row,
+      };
+    });
+    setCsvMap(columns);
+    setAssets(newAssets);
   }, []);
+
+  const loadFiles = useCallback(
+    async (files: File[]) => {
+      try {
+        for (const file of files) {
+          const lower = file.name.toLowerCase();
+          if (lower.endsWith('.json')) {
+            jsonDriversRef.current = await parseEntrylistJson(file);
+            setJsonFileName(file.name);
+          } else if (lower.endsWith('.csv')) {
+            const parsed = await parseCSV(file);
+            if (parsed.rows.length === 0 || parsed.headers.length === 0) {
+              alert('CSV jest pusty lub nie ma nagłówków.');
+              continue;
+            }
+            csvParsedRef.current = parsed;
+            setCsvFileName(file.name);
+          }
+        }
+        rebuildAssets();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Błąd odczytu pliku.');
+      }
+    },
+    [rebuildAssets]
+  );
 
   const handleNameColsChange = useCallback((colIndex: number, checked: boolean) => {
     setCsvMap((prev) => {
@@ -215,8 +255,11 @@ const App: React.FC = () => {
   };
 
   const clearAll = () => {
+    csvParsedRef.current = null;
+    jsonDriversRef.current = null;
     setAssets([]);
     setCsvFileName(null);
+    setJsonFileName(null);
     setCsvMap(null);
   };
 
@@ -252,10 +295,19 @@ const App: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
           <div className="lg:col-span-5 xl:col-span-4 space-y-4">
             <CsvDropzone
-              onFile={loadCsvFile}
+              onFiles={loadFiles}
               disabled={isProcessingQueue}
-              fileName={csvFileName}
+              fileName={[csvFileName, jsonFileName].filter(Boolean).join(' + ') || null}
               rowCount={assets.length}
+              hint={
+                jsonFileName && !csvFileName
+                  ? 'Wgraj też CSV z SimGrid, żeby dostać samochód i klasę.'
+                  : csvFileName && !jsonFileName
+                    ? 'Wgraj też JSON (Entrylist), żeby dostać prawdziwe imię i nazwisko.'
+                    : csvFileName && jsonFileName
+                      ? 'Połączono CSV (auto/klasa) z JSON (imię i nazwisko).'
+                      : null
+              }
             />
 
             {csvMap && (
@@ -299,12 +351,21 @@ const App: React.FC = () => {
               <div className="grid grid-cols-1 gap-6">
                 <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">
-                    Pola CSV na imię i nazwisko
+                    Pola na imię i nazwisko
                   </label>
                   {csvMap ? (
                     <>
                       <p className="text-xs text-gray-500">
-                        Domyślnie zaznaczone jest <span className="text-twitch-300">real name</span>.
+                        {csvMap.headers.some((h) => /^firstName$/i.test(h) || /^lastName$/i.test(h)) ? (
+                          <>
+                            Domyślnie <span className="text-twitch-300">firstName</span> +{' '}
+                            <span className="text-twitch-300">lastName</span> z JSON.
+                          </>
+                        ) : (
+                          <>
+                            Domyślnie zaznaczone jest <span className="text-twitch-300">real name</span>.
+                          </>
+                        )}{' '}
                         Możesz wybrać kilka pól — złożą się w jedną nazwę na banerze.
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto rounded-lg border border-gray-700 bg-gray-950 p-3">
@@ -335,7 +396,7 @@ const App: React.FC = () => {
                     </>
                   ) : (
                     <div className="rounded-lg border border-dashed border-gray-700 bg-gray-950/50 px-4 py-3 text-sm text-gray-500">
-                      Najpierw wgraj CSV po lewej — tu pojawią się wszystkie kolumny do wyboru nazwiska.
+                      Najpierw wgraj CSV lub JSON po lewej — tu pojawią się pola do wyboru nazwiska.
                     </div>
                   )}
                 </div>
@@ -365,10 +426,12 @@ const App: React.FC = () => {
                     <FileSpreadsheet className="w-5 h-5 text-twitch-400" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-white mb-1">CSV → PNG 1000×100</h4>
+                    <h4 className="text-sm font-bold text-white mb-1">CSV / JSON → PNG 1000×100</h4>
                     <p className="text-xs text-gray-400 leading-relaxed mb-2">
-                      Banery rysowane lokalnie (Canvas). Dane biorą się z kolumn{' '}
-                      <span className="text-twitch-300">real name, car number, car name, car class</span>.
+                      Banery rysowane lokalnie (Canvas). JSON z SimGrid daje{' '}
+                      <span className="text-twitch-300">firstName / lastName</span>, CSV —{' '}
+                      <span className="text-twitch-300">car name</span> i{' '}
+                      <span className="text-twitch-300">car class</span>.
                     </p>
                     <div className="flex items-center gap-2 text-xs text-green-400 bg-green-900/20 px-2 py-1 rounded w-fit">
                       <Scissors className="w-3 h-3" />
@@ -467,7 +530,7 @@ const App: React.FC = () => {
                 <FileSpreadsheet className="w-12 h-12 text-gray-600" />
               </div>
               <p className="text-xl text-gray-500">Brak listy kierowców.</p>
-              <p className="text-sm text-gray-600">Wgraj CSV z entry list, żeby wygenerować banery.</p>
+              <p className="text-sm text-gray-600">Wgraj CSV i/lub JSON z SimGrid, żeby wygenerować banery.</p>
             </div>
           )}
         </div>

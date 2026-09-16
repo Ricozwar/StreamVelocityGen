@@ -46,13 +46,31 @@ export function getCsvColumnIndices(headers: string[]): CsvColumnMap {
   const find = (...keywords: string[]) =>
     h.findIndex((cell) => keywords.some((k) => cell.includes(k)));
 
-  let nameCol = h.findIndex((c) => c.includes('real name'));
-  if (nameCol < 0) nameCol = find('imie', 'nazwisko', 'kierowca', 'driver');
-  if (nameCol < 0) nameCol = 0;
+  const firstNameCol = h.findIndex((c) => c === 'firstname' || c === 'first name');
+  const lastNameCol = h.findIndex((c) => c === 'lastname' || c === 'last name');
+
+  let nameCols: number[];
+  if (firstNameCol >= 0 || lastNameCol >= 0) {
+    nameCols = [firstNameCol, lastNameCol].filter((i) => i >= 0);
+  } else {
+    let nameCol = h.findIndex((c) => c.includes('real name'));
+    if (nameCol < 0) nameCol = find('imie', 'nazwisko', 'kierowca', 'driver');
+    if (nameCol < 0) nameCol = 0;
+    nameCols = [nameCol];
+  }
 
   let numCol = h.findIndex((c) => c.includes('car number'));
-  if (numCol < 0) numCol = find('numer', 'number', 'nr');
-  if (numCol < 0) numCol = Math.min(1, headers.length - 1);
+  if (numCol < 0) numCol = h.findIndex((c) => c === 'racenumber' || c === 'race number');
+  if (numCol < 0) numCol = find('numer');
+  if (numCol < 0) {
+    numCol = h.findIndex(
+      (c) =>
+        (c.includes('number') || c === 'nr') &&
+        !c.includes('licence') &&
+        !c.includes('license')
+    );
+  }
+  if (numCol < 0) numCol = -1;
 
   let brandCol = h.findIndex((c) => c.includes('car name'));
   if (brandCol < 0) brandCol = find('marka', 'brand', 'samochod', 'auto');
@@ -62,12 +80,12 @@ export function getCsvColumnIndices(headers: string[]): CsvColumnMap {
   if (classCol < 0) classCol = find('klasa', 'class', 'kategoria');
 
   return {
-    nameCols: [nameCol],
+    nameCols,
     numCol,
     brandCol,
     classCol,
-    nameHeaders: [headers[nameCol] ?? 'real name'],
-    numHeader: headers[numCol] ?? '—',
+    nameHeaders: nameCols.map((i) => headers[i] ?? '—'),
+    numHeader: numCol >= 0 ? (headers[numCol] ?? '—') : 'brak',
     brandHeader: headers[brandCol] ?? '—',
     classHeader: classCol >= 0 ? (headers[classCol] ?? null) : null,
     headers,
@@ -94,8 +112,7 @@ export function brandFromCarName(carName: string): string {
  * Parse CSV file: first line = headers, rest = data rows.
  * Handles quoted fields (e.g. "Name, Team" as one column). Expects UTF-8.
  */
-export async function parseCSV(file: File): Promise<ParsedCSV> {
-  const text = await file.text();
+export function parseCSVText(text: string): ParsedCSV {
   const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length === 0) {
     return { headers: [], rows: [] };
@@ -106,4 +123,8 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
     rows.push(parseCSVLine(lines[i]));
   }
   return { headers, rows };
+}
+
+export async function parseCSV(file: File): Promise<ParsedCSV> {
+  return parseCSVText(await file.text());
 }
