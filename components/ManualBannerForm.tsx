@@ -3,21 +3,6 @@ import { Plus } from 'lucide-react';
 import { BrandPicker } from './BrandPicker';
 import type { LogoBrand } from '../services/logoCatalog';
 
-export const BANNER_CLASS_OPTIONS = [
-  'PRO',
-  'PRO-AM',
-  'GOLD',
-  'SILVER',
-  'BRONZE',
-  'AM',
-  'GT3',
-  'GT4',
-  'GT2',
-  'TCR',
-  'CUP',
-  'ST',
-];
-
 export interface ManualBannerEntry {
   driverName: string;
   carNumber: string;
@@ -38,7 +23,7 @@ const emptyDraft = {
   carNumber: '',
   teamName: '',
   carBrand: '',
-  classCategory: 'GT4',
+  classCategory: '',
 };
 
 export const ManualBannerForm: React.FC<ManualBannerFormProps> = ({
@@ -141,18 +126,12 @@ export const ManualBannerForm: React.FC<ManualBannerFormProps> = ({
         <span className="block text-[10px] uppercase tracking-wider text-gray-500">Klasa</span>
         <input
           type="text"
-          list="banner-class-options"
           value={draft.classCategory}
           disabled={disabled}
           onChange={(e) => setDraft((prev) => ({ ...prev, classCategory: e.target.value }))}
           placeholder="GT4"
           className={fieldClass}
         />
-        <datalist id="banner-class-options">
-          {BANNER_CLASS_OPTIONS.map((cls) => (
-            <option key={cls} value={cls} />
-          ))}
-        </datalist>
       </label>
 
       <button
