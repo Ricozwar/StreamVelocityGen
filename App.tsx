@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { CsvDropzone } from './components/CsvDropzone';
 import { GalleryItem } from './components/GalleryItem';
@@ -14,9 +14,17 @@ import type { ParsedCSV } from './services/csvParser';
 import { parseCSV, getCsvColumnIndices, brandFromCarName, composeDriverName } from './services/csvParser';
 import type { JsonDriver } from './services/jsonParser';
 import { parseEntrylistJson, jsonDriversToTable, applyJsonNamesToCsv } from './services/jsonParser';
-import { generateRacingOverlayFromStats, getAvailableLogoBrands } from './services/bannerService';
+import { generateRacingOverlayFromStats } from './services/bannerService';
 import { downloadAllBanners } from './services/bannerDownload';
-import { Palette, Wand2, Trash2, Scissors, FileSpreadsheet, Download } from 'lucide-react';
+import {
+  loadLogoCatalog,
+  saveUploadedLogo,
+  findLogoBrand,
+  brandLabel,
+  normalizeBrandKey,
+  type LogoBrand,
+} from './services/logoCatalog';
+import { Palette, Wand2, Trash2, Scissors, FileSpreadsheet, Download, Car } from 'lucide-react';
 
 const App: React.FC = () => {
   const [assets, setAssets] = useState<StreamAsset[]>([]);
@@ -32,7 +40,14 @@ const App: React.FC = () => {
   const assetsRef = useRef<StreamAsset[]>([]);
   const csvParsedRef = useRef<ParsedCSV | null>(null);
   const jsonDriversRef = useRef<JsonDriver[] | null>(null);
+  const [logoBrands, setLogoBrands] = useState<LogoBrand[]>([]);
+  const logoBrandsRef = useRef<LogoBrand[]>([]);
   assetsRef.current = assets;
+  logoBrandsRef.current = logoBrands;
+
+  useEffect(() => {
+    void loadLogoCatalog().then(setLogoBrands);
+  }, []);
 
   const rebuildAssets = useCallback(() => {
     const csv = csvParsedRef.current;
@@ -138,14 +153,38 @@ const App: React.FC = () => {
   }, []);
 
   const handleUpdateBrand = useCallback((id: string, brand: string) => {
+    const nextBrand = normalizeBrandKey(brand);
     setAssets((prev) =>
       prev.map((a) => {
         if (a.id !== id) return a;
-        const carBrand = brand || undefined;
+        const carBrand = nextBrand || undefined;
+        const wasGenerated = a.status === GenerationStatus.SUCCESS;
         return {
           ...a,
           carBrand,
-          stats: { ...a.stats, carBrand: (brand || a.stats.carBrand || 'RACING').toUpperCase() },
+          stats: { ...a.stats, carBrand: nextBrand || a.stats.carBrand || 'RACING' },
+          ...(wasGenerated
+            ? { status: GenerationStatus.IDLE, generatedUrl: undefined, generatedName: undefined }
+            : {}),
+        };
+      })
+    );
+  }, []);
+
+  const handleUploadLogo = useCallback(async (brand: string, file: File) => {
+    const saved = await saveUploadedLogo(brand, file);
+    const catalog = await loadLogoCatalog();
+    setLogoBrands(catalog);
+    const key = saved.value;
+    setAssets((prev) =>
+      prev.map((a) => {
+        if (normalizeBrandKey(a.carBrand || a.stats.carBrand || '') !== key) return a;
+        if (a.status !== GenerationStatus.SUCCESS) return a;
+        return {
+          ...a,
+          status: GenerationStatus.IDLE,
+          generatedUrl: undefined,
+          generatedName: undefined,
         };
       })
     );
@@ -193,7 +232,8 @@ const App: React.FC = () => {
         const generatedImage = await generateRacingOverlayFromStats(
           stats,
           nameToRender,
-          config.style
+          config.style,
+          logoBrandsRef.current
         );
 
         setAssets((prev) =>
@@ -273,7 +313,14 @@ const App: React.FC = () => {
   const generatedCount = assets.filter(
     (a) => a.status === GenerationStatus.SUCCESS && a.generatedUrl
   ).length;
-  const availableLogoBrands = getAvailableLogoBrands();
+  const uniqueCars = useMemo(() => {
+    const keys = new Set<string>();
+    for (const asset of assets) {
+      const key = normalizeBrandKey(asset.carBrand || asset.stats.carBrand || '');
+      if (key && key !== 'RACING') keys.add(key);
+    }
+    return [...keys].sort((a, b) => a.localeCompare(b, 'pl'));
+  }, [assets]);
 
   const handleDownloadAll = useCallback(async () => {
     if (generatedCount === 0 || isDownloadingAll) return;
@@ -323,6 +370,52 @@ const App: React.FC = () => {
                   Klasa:{' '}
                   <span className="text-white">{csvMap.classHeader ?? 'brak — użyto PRO'}</span>
                 </p>
+              </div>
+            )}
+
+            {uniqueCars.length > 0 && (
+              <div className="rounded-lg border border-gray-800 bg-gray-950/60 p-4 space-y-3">
+                <p className="text-gray-300 font-medium text-xs uppercase tracking-wider flex items-center gap-2">
+                  <Car className="w-3.5 h-3.5 text-twitch-400" />
+                  Auta na liście
+                </p>
+                <p className="text-xs text-gray-500">
+                  Wybierz markę z logo albo wgraj brakujące — zapisze się jako PNG w{' '}
+                  <span className="text-gray-300">public/logos</span>.
+                </p>
+                <div className="space-y-2">
+                  {uniqueCars.map((key) => {
+                    const known = findLogoBrand(logoBrands, key);
+                    return (
+                      <div key={key} className="flex items-center gap-2">
+                        <span className="w-8 h-8 shrink-0 rounded bg-white flex items-center justify-center overflow-hidden">
+                          {known?.src ? (
+                            <img src={known.src} alt="" className="max-w-full max-h-full object-contain p-0.5" />
+                          ) : (
+                            <Car className="w-4 h-4 text-gray-400" />
+                          )}
+                        </span>
+                        <span className="text-sm text-white truncate flex-1">{known?.label || brandLabel(key)}</span>
+                        {known?.src ? null : (
+                          <label className="text-[10px] uppercase tracking-wide text-twitch-300 cursor-pointer hover:text-white shrink-0">
+                            Wgraj logo
+                            <input
+                              type="file"
+                              accept="image/png,image/svg+xml,image/jpeg,image/webp,image/gif,.png,.svg,.jpg,.jpeg,.webp"
+                              className="hidden"
+                              disabled={isProcessingQueue}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                e.target.value = '';
+                                if (file) void handleUploadLogo(key, file);
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -510,13 +603,14 @@ const App: React.FC = () => {
               <div key={asset.id} className="h-full">
                 <GalleryItem
                   asset={asset}
-                  availableLogoBrands={availableLogoBrands}
+                  logoBrands={logoBrands}
                   showTeamInput={includeTeamNameFromCsv}
                   onRetry={() => handleRegenerate(asset.id)}
                   onReset={handleResetAsset}
                   onRemove={removeAsset}
                   onUpdateName={handleUpdateName}
                   onUpdateBrand={handleUpdateBrand}
+                  onUploadLogo={handleUploadLogo}
                   onUpdateTeam={handleUpdateTeam}
                   onSaveName={() => handleRegenerate(asset.id)}
                 />

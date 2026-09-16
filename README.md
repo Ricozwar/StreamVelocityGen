@@ -34,6 +34,8 @@ Wejście: lista zgłoszeń z SimGrid (UTF-8). Możesz wrzucić **tylko CSV**, **
 
 JSON i CSV spina `playerID` z JSON (`P…` / `M…` / `S…`) z kolumnami `psn_id`, `xbox_id`, `steam64_id`. Wpisy w JSON bez imienia (same admin ID) są pomijane.
 
+Marka na banerze: lista z podglądem logo z `public/logos`. Brakujące logo można wgrać (PNG/SVG/JPG) — aplikacja zapisuje je jako PNG `public/logos/{marka}.png` (przy `npm run dev`) i używa przy kolejnych banerach.
+
 Przykład CSV w repo: `entrylist (15).csv`.
 
 1. Upuść lub wybierz CSV i/lub JSON (Entrylist).

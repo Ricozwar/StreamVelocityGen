@@ -1,0 +1,74 @@
+{
+  "brands": [
+    {
+      "key": "AMG",
+      "file": "logos/AMG.png",
+      "label": "AMG"
+    },
+    {
+      "key": "ASTON MARTIN",
+      "file": "logos/Aston martin.png",
+      "label": "Aston Martin"
+    },
+    {
+      "key": "AUDI",
+      "file": "logos/Audi.png",
+      "label": "Audi"
+    },
+    {
+      "key": "BENTLEY",
+      "file": "logos/bentley.png",
+      "label": "Bentley"
+    },
+    {
+      "key": "BMW",
+      "file": "logos/BMW.png",
+      "label": "BMW"
+    },
+    {
+      "key": "CHEVROLET",
+      "file": "logos/Chevrolet.png",
+      "label": "Chevrolet"
+    },
+    {
+      "key": "FERRARI",
+      "file": "logos/Ferrari.png",
+      "label": "Ferrari"
+    },
+    {
+      "key": "FORD",
+      "file": "logos/Ford.png",
+      "label": "Ford"
+    },
+    {
+      "key": "HONDA",
+      "file": "logos/honda.png",
+      "label": "Honda"
+    },
+    {
+      "key": "LAMBORGHINI",
+      "file": "logos/Lamborghini.png",
+      "label": "Lamborghini"
+    },
+    {
+      "key": "MAZDA",
+      "file": "logos/mazda.png",
+      "label": "Mazda"
+    },
+    {
+      "key": "MCLAREN",
+      "file": "logos/Mclaren.png",
+      "label": "Mclaren"
+    },
+    {
+      "key": "MERCEDES",
+      "file": "logos/mercedes.png",
+      "label": "Mercedes"
+    },
+    {
+      "key": "PORSCHE",
+      "file": "logos/Porsche.png",
+      "label": "Porsche"
+    }
+  ]
+}

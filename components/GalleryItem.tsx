@@ -1,34 +1,38 @@
 import React from 'react';
 import { StreamAsset, GenerationStatus } from '../types';
-import { Loader2, AlertCircle, Scissors, Pencil, RotateCcw, Car, Users, Save } from 'lucide-react';
+import { Loader2, AlertCircle, Scissors, Pencil, RotateCcw, Users, Save } from 'lucide-react';
 import {
   bannerFilename,
   cropBannerToPngBlob,
   triggerDownload,
 } from '../services/bannerDownload';
+import { BrandPicker } from './BrandPicker';
+import type { LogoBrand } from '../services/logoCatalog';
 
 interface GalleryItemProps {
   asset: StreamAsset;
-  availableLogoBrands: { value: string; label: string }[];
+  logoBrands: LogoBrand[];
   showTeamInput?: boolean;
   onRetry: (id: string) => void;
   onReset: (id: string) => void;
   onRemove: (id: string) => void;
   onUpdateName: (id: string, name: string) => void;
   onUpdateBrand: (id: string, brand: string) => void;
+  onUploadLogo: (brand: string, file: File) => Promise<void>;
   onUpdateTeam?: (id: string, teamName: string) => void;
   onSaveName?: (id: string) => void;
 }
 
 export const GalleryItem: React.FC<GalleryItemProps> = ({
   asset,
-  availableLogoBrands,
+  logoBrands,
   showTeamInput,
   onRetry,
   onReset,
   onRemove,
   onUpdateName,
   onUpdateBrand,
+  onUploadLogo,
   onUpdateTeam,
   onSaveName,
 }) => {
@@ -46,8 +50,8 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
   };
 
   return (
-    <div className="bg-gray-900 rounded-xl overflow-hidden border border-gray-800 shadow-xl flex flex-col h-full group/card transition-all hover:border-gray-700">
-      <div className="relative aspect-video bg-black">
+    <div className="bg-gray-900 rounded-xl border border-gray-800 shadow-xl flex flex-col h-full group/card transition-all hover:border-gray-700">
+      <div className="relative aspect-video bg-black overflow-hidden rounded-t-xl">
         {isGenerating && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 backdrop-blur-sm">
             <Loader2 className="w-10 h-10 text-twitch-500 animate-spin mb-3" />
@@ -139,34 +143,13 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
             {nameDirty ? 'Zapisz i przerysuj baner' : 'Zapisane'}
           </button>
         )}
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Car className="h-3 w-3 text-gray-500" />
-          </div>
-          <select
-            value={asset.carBrand || ''}
-            onChange={(e) => onUpdateBrand(asset.id, e.target.value)}
-            disabled={nameLocked || isSuccess}
-            className={`
-                    w-full bg-gray-900 text-sm text-white border border-gray-800 rounded-md py-2 pl-9 pr-8
-                    focus:outline-none focus:ring-1 focus:ring-twitch-500 focus:border-twitch-500
-                    transition-colors appearance-none cursor-pointer
-                    ${nameLocked || isSuccess ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-700'}
-                `}
-          >
-            <option value="">Wybierz markę (logo)</option>
-            {[
-              ...(asset.carBrand && !availableLogoBrands.some((b) => b.value === asset.carBrand)
-                ? [{ value: asset.carBrand, label: asset.carBrand.replace(/_/g, ' ') }]
-                : []),
-              ...availableLogoBrands,
-            ].map(({ value, label }) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <BrandPicker
+          value={asset.carBrand || asset.stats.carBrand}
+          brands={logoBrands}
+          disabled={nameLocked}
+          onChange={(brand) => onUpdateBrand(asset.id, brand)}
+          onUploadLogo={onUploadLogo}
+        />
         {showTeamInput && onUpdateTeam && (
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

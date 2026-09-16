@@ -1,4 +1,6 @@
 import { RacingStyle, OverlayStats } from '../types';
+import type { LogoBrand } from './logoCatalog';
+import { loadBrandLogoImage } from './logoCatalog';
 
 const assetUrl = (pathFromPublic: string): string => {
   const base = import.meta.env.BASE_URL || '/';
@@ -32,19 +34,6 @@ const GT_WORLD_LOGOS: Record<string, string> = {
   HONDA: 'logos/honda.png',
   SALEEN: 'logos/saleen.png',
   CALLAWAY: 'logos/callaway.png',
-};
-
-export const getAvailableLogoBrands = (): { value: string; label: string }[] => {
-  const pathToKey: Record<string, string> = {};
-  for (const [key, path] of Object.entries(GT_WORLD_LOGOS)) {
-    if (!pathToKey[path]) pathToKey[path] = key;
-  }
-  return Object.entries(pathToKey)
-    .map(([, key]) => ({
-      value: key,
-      label: key.charAt(0) + key.slice(1).toLowerCase().replace(/_/g, ' '),
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label));
 };
 
 const loadImage = (src: string): Promise<HTMLImageElement> => {
@@ -124,7 +113,8 @@ const drawImageContain = (
 const renderCanvasOverlay = async (
   stats: OverlayStats,
   driverName: string,
-  style: RacingStyle
+  style: RacingStyle,
+  logoCatalog: LogoBrand[]
 ): Promise<string> => {
   const canvas = document.createElement('canvas');
   canvas.width = 1920;
@@ -197,19 +187,22 @@ const renderCanvasOverlay = async (
   let logoDrawn = false;
 
   const cleanBrand = stats.carBrand.trim().toUpperCase();
-  let specificFile = GT_WORLD_LOGOS[cleanBrand];
-
-  if (!specificFile) {
-    const foundKey = Object.keys(GT_WORLD_LOGOS).find((k) => cleanBrand.includes(k));
-    if (foundKey) specificFile = GT_WORLD_LOGOS[foundKey];
+  const catalogLogo = await loadBrandLogoImage(cleanBrand, logoCatalog);
+  if (catalogLogo) {
+    drawImageContain(ctx, catalogLogo, brandX, bannerY, brandBoxWidth, bannerHeight);
+    logoDrawn = true;
   }
 
-  if (!specificFile) {
-    const filename = cleanBrand.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    specificFile = `logos/${filename}.png`;
-  }
-
-  if (specificFile) {
+  if (!logoDrawn) {
+    let specificFile = GT_WORLD_LOGOS[cleanBrand];
+    if (!specificFile) {
+      const foundKey = Object.keys(GT_WORLD_LOGOS).find((k) => cleanBrand.includes(k));
+      if (foundKey) specificFile = GT_WORLD_LOGOS[foundKey];
+    }
+    if (!specificFile) {
+      const filename = cleanBrand.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      specificFile = `logos/${filename}.png`;
+    }
     const logoImg = await loadLogoWithVariants(assetUrl(specificFile));
     if (logoImg) {
       drawImageContain(ctx, logoImg, brandX, bannerY, brandBoxWidth, bannerHeight);
@@ -339,8 +332,9 @@ const renderCanvasOverlay = async (
 export const generateRacingOverlayFromStats = async (
   stats: OverlayStats,
   driverName: string,
-  style: RacingStyle
+  style: RacingStyle,
+  logoCatalog: LogoBrand[] = []
 ): Promise<string> => {
   const name = (driverName || '').trim() || 'DRIVER NAME';
-  return await renderCanvasOverlay(stats, name, style);
+  return await renderCanvasOverlay(stats, name, style, logoCatalog);
 };
