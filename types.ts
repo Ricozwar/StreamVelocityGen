@@ -1,3 +1,5 @@
+import type { BannerColors } from './services/bannerColors';
+
 export enum GenerationStatus {
   IDLE = 'IDLE',
   LOADING = 'LOADING',
@@ -5,14 +7,7 @@ export enum GenerationStatus {
   ERROR = 'ERROR',
 }
 
-export enum RacingStyle {
-  GTWC_BROADCAST = 'GT World Challenge TV',
-  NEON_STREET = 'Neon Street',
-  FORMULA_TECH = 'Formula Tech',
-  RALLY_DIRT = 'Rally Dirt',
-  RETRO_WAVE = 'Retro Synthwave',
-  CYBERPUNK = 'Cyberpunk Racing'
-}
+export type { BannerColors };
 
 export interface OverlayStats {
   carNumber: string;
@@ -39,8 +34,8 @@ export interface StreamAsset {
 }
 
 export interface GeneratorConfig {
-  style: RacingStyle;
   showCarNumber: boolean;
+  colors: BannerColors;
 }
 
 export interface CsvColumnMap {

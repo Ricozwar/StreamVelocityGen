@@ -1,6 +1,13 @@
-import { RacingStyle, OverlayStats } from '../types';
+import { OverlayStats } from '../types';
 import type { LogoBrand } from './logoCatalog';
 import { loadBrandLogoImage } from './logoCatalog';
+import {
+  hexToRgba,
+  isLightHex,
+  mixTowardBlack,
+  type BannerColors,
+  DEFAULT_BANNER_COLORS,
+} from './bannerColors';
 
 const assetUrl = (pathFromPublic: string): string => {
   const base = import.meta.env.BASE_URL || '/';
@@ -113,7 +120,7 @@ const drawImageContain = (
 const renderCanvasOverlay = async (
   stats: OverlayStats,
   driverName: string,
-  style: RacingStyle,
+  colors: BannerColors,
   logoCatalog: LogoBrand[]
 ): Promise<string> => {
   const canvas = document.createElement('canvas');
@@ -138,43 +145,17 @@ const renderCanvasOverlay = async (
 
   const fontBold = "bold 50px 'Inter', sans-serif";
   const fontSmall = "bold 24px 'Inter', sans-serif";
-
-  let accentColor = '#ff0000';
-  let skew = 0;
-
-  switch (style) {
-    case RacingStyle.GTWC_BROADCAST:
-      skew = -0.2;
-      break;
-    case RacingStyle.NEON_STREET:
-      accentColor = '#00ffff';
-      skew = 0;
-      break;
-    case RacingStyle.RETRO_WAVE:
-      accentColor = '#ff00ff';
-      skew = -0.1;
-      break;
-    case RacingStyle.RALLY_DIRT:
-      accentColor = '#ff6f00';
-      skew = 0;
-      break;
-    case RacingStyle.FORMULA_TECH:
-      accentColor = '#00ffcc';
-      skew = 0;
-      break;
-    default:
-      break;
-  }
-
-  ctx.setTransform(1, 0, skew, 1, skew * -centerY, 0);
+  const barColor = colors.barColor || DEFAULT_BANNER_COLORS.barColor;
+  const nameColor = colors.nameColor || DEFAULT_BANNER_COLORS.nameColor;
+  const numberColor = colors.numberColor || DEFAULT_BANNER_COLORS.numberColor;
 
   const showNumber = Boolean(stats.showCarNumber);
   const numBoxWidth = showNumber ? 110 : 0;
   if (showNumber) {
-    ctx.fillStyle = style === RacingStyle.GTWC_BROADCAST ? '#cc0000' : accentColor;
+    ctx.fillStyle = numberColor;
     ctx.fillRect(startX, bannerY, numBoxWidth, bannerHeight);
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = isLightHex(numberColor) ? '#111111' : '#ffffff';
     ctx.font = fontBold;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -257,8 +238,8 @@ const renderCanvasOverlay = async (
   const nameBarX = brandX + brandBoxWidth;
 
   const grad = ctx.createLinearGradient(nameBarX, bannerY, nameBarX + nameBarWidth, bannerY);
-  grad.addColorStop(0, '#1a1a1a');
-  grad.addColorStop(1, '#0a0a0a');
+  grad.addColorStop(0, barColor);
+  grad.addColorStop(1, mixTowardBlack(barColor, 0.28));
   ctx.fillStyle = grad;
   ctx.fillRect(nameBarX, bannerY, nameBarWidth, bannerHeight);
 
@@ -287,7 +268,7 @@ const renderCanvasOverlay = async (
     }
   }
 
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = nameColor;
   ctx.font = "bold 40px 'Inter', sans-serif";
   ctx.textAlign = 'left';
   const nameUpper = driverName ? driverName.toUpperCase() : 'DRIVER NAME';
@@ -296,13 +277,13 @@ const renderCanvasOverlay = async (
     ctx.font = "bold 36px 'Inter', sans-serif";
     ctx.fillText(nameUpper, nameBarX + textOffsetX, bannerY + bannerHeight / 2 - 12);
     ctx.font = "bold 20px 'Inter', sans-serif";
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillStyle = hexToRgba(nameColor, 0.85);
     ctx.fillText(
       stats.teamName!.trim().toUpperCase(),
       nameBarX + textOffsetX,
       bannerY + bannerHeight / 2 + 18
     );
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = nameColor;
   } else {
     ctx.fillText(nameUpper, nameBarX + textOffsetX, bannerY + bannerHeight / 2 + 2);
   }
@@ -327,17 +308,15 @@ const renderCanvasOverlay = async (
   ctx.textAlign = 'center';
   ctx.fillText(cls, classX + classBoxWidth / 2, bannerY + bannerHeight / 2 + 1);
 
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-
   return canvas.toDataURL('image/png');
 };
 
 export const generateRacingOverlayFromStats = async (
   stats: OverlayStats,
   driverName: string,
-  style: RacingStyle,
+  colors: BannerColors = DEFAULT_BANNER_COLORS,
   logoCatalog: LogoBrand[] = []
 ): Promise<string> => {
   const name = (driverName || '').trim() || 'DRIVER NAME';
-  return await renderCanvasOverlay(stats, name, style, logoCatalog);
+  return await renderCanvasOverlay(stats, name, colors, logoCatalog);
 };

@@ -5,7 +5,6 @@ import { GalleryItem } from './components/GalleryItem';
 import {
   StreamAsset,
   GenerationStatus,
-  RacingStyle,
   GeneratorConfig,
   OverlayStats,
   CsvColumnMap,
@@ -16,6 +15,7 @@ import type { JsonDriver } from './services/jsonParser';
 import { parseEntrylistJson, jsonDriversToTable, applyJsonNamesToCsv } from './services/jsonParser';
 import { generateRacingOverlayFromStats } from './services/bannerService';
 import { downloadAllBanners } from './services/bannerDownload';
+import { DEFAULT_BANNER_COLORS, type BannerColors } from './services/bannerColors';
 import {
   loadLogoCatalog,
   saveUploadedLogo,
@@ -25,12 +25,13 @@ import {
   type LogoBrand,
 } from './services/logoCatalog';
 import { Palette, Wand2, Trash2, Scissors, FileSpreadsheet, Download, Car } from 'lucide-react';
+import { BannerColorPicker } from './components/BannerColorPicker';
 
 const App: React.FC = () => {
   const [assets, setAssets] = useState<StreamAsset[]>([]);
   const [config, setConfig] = useState<GeneratorConfig>({
-    style: RacingStyle.GTWC_BROADCAST,
     showCarNumber: false,
+    colors: DEFAULT_BANNER_COLORS,
   });
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const [includeTeamNameFromCsv, setIncludeTeamNameFromCsv] = useState(false);
@@ -44,6 +45,7 @@ const App: React.FC = () => {
   const [logoBrands, setLogoBrands] = useState<LogoBrand[]>([]);
   const logoBrandsRef = useRef<LogoBrand[]>([]);
   const configRef = useRef(config);
+  const regenTimerRef = useRef<number | null>(null);
   assetsRef.current = assets;
   logoBrandsRef.current = logoBrands;
   configRef.current = config;
@@ -236,7 +238,7 @@ const App: React.FC = () => {
         const generatedImage = await generateRacingOverlayFromStats(
           stats,
           nameToRender,
-          configRef.current.style,
+          configRef.current.colors,
           logoBrandsRef.current
         );
 
@@ -289,6 +291,27 @@ const App: React.FC = () => {
     }
     setIsProcessingQueue(false);
   }, [handleGenerate]);
+
+  const applyBannerColors = useCallback(
+    (colors: BannerColors, immediate: boolean) => {
+      const next = { ...configRef.current, colors };
+      configRef.current = next;
+      setConfig(next);
+      if (regenTimerRef.current != null) {
+        window.clearTimeout(regenTimerRef.current);
+        regenTimerRef.current = null;
+      }
+      if (immediate) {
+        void regenerateDrawnBanners();
+        return;
+      }
+      regenTimerRef.current = window.setTimeout(() => {
+        regenTimerRef.current = null;
+        void regenerateDrawnBanners();
+      }, 280);
+    },
+    [regenerateDrawnBanners]
+  );
 
   const handleGenerateAll = useCallback(async () => {
     setIsProcessingQueue(true);
@@ -536,26 +559,15 @@ const App: React.FC = () => {
 
                 <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">
-                    Styl
+                    Kolorystyka
                   </label>
-                  <select
-                    value={config.style}
-                    onChange={(e) => {
-                      const style = e.target.value as RacingStyle;
-                      const next = { ...configRef.current, style };
-                      configRef.current = next;
-                      setConfig(next);
-                      void regenerateDrawnBanners();
-                    }}
-                    className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-twitch-500 focus:border-transparent outline-none transition-all appearance-none cursor-pointer hover:border-gray-600"
+                  <BannerColorPicker
+                    colors={config.colors}
+                    showNumber={config.showCarNumber}
                     disabled={isProcessingQueue || isDownloadingAll}
-                  >
-                    {Object.values(RacingStyle).map((style) => (
-                      <option key={style} value={style}>
-                        {style}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(colors) => applyBannerColors(colors, false)}
+                    onPreset={(colors) => applyBannerColors(colors, true)}
+                  />
                 </div>
 
                 <div className="bg-gray-950/50 border border-gray-700/50 rounded-lg p-4 flex items-start gap-4">
