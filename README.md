@@ -28,7 +28,7 @@ Wejście: lista zgłoszeń z SimGrid (UTF-8). Możesz wrzucić **tylko CSV**, **
 | Dane na banerze | Źródło |
 | --- | --- |
 | Imię i nazwisko | JSON: `firstName` + `lastName`. CSV: domyślnie `real name` (w eksporcie SimGrid to zwykle nick). Po wczytaniu możesz zaznaczyć inne / kilka pól. Po wygenerowaniu nazwę da się poprawić i **Zapisać** (przerysuje baner). |
-| Numer | `car number` / `raceNumber` |
+| Numer | Domyślnie **wyłączony**. Opcja „Pokaż numer startowy” rysuje czerwone pole z `car number` / `raceNumber`. W SimGrid numerów zwykle nie ma. |
 | Marka / logo | CSV `car name` (pierwszy człon, np. Mazda) |
 | Klasa | CSV `car class` (gdy brak — PRO) |
 

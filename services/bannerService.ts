@@ -168,15 +168,18 @@ const renderCanvasOverlay = async (
 
   ctx.setTransform(1, 0, skew, 1, skew * -centerY, 0);
 
-  const numBoxWidth = 110;
-  ctx.fillStyle = style === RacingStyle.GTWC_BROADCAST ? '#cc0000' : accentColor;
-  ctx.fillRect(startX, bannerY, numBoxWidth, bannerHeight);
+  const showNumber = Boolean(stats.showCarNumber);
+  const numBoxWidth = showNumber ? 110 : 0;
+  if (showNumber) {
+    ctx.fillStyle = style === RacingStyle.GTWC_BROADCAST ? '#cc0000' : accentColor;
+    ctx.fillRect(startX, bannerY, numBoxWidth, bannerHeight);
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = fontBold;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(stats.carNumber, startX + numBoxWidth / 2, bannerY + bannerHeight / 2 + 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = fontBold;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(stats.carNumber, startX + numBoxWidth / 2, bannerY + bannerHeight / 2 + 2);
+  }
 
   const brandBoxWidth = 150;
   const brandX = startX + numBoxWidth;

@@ -13,6 +13,7 @@ interface GalleryItemProps {
   asset: StreamAsset;
   logoBrands: LogoBrand[];
   showTeamInput?: boolean;
+  showCarNumber?: boolean;
   onRetry: (id: string) => void;
   onReset: (id: string) => void;
   onRemove: (id: string) => void;
@@ -27,6 +28,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
   asset,
   logoBrands,
   showTeamInput,
+  showCarNumber,
   onRetry,
   onReset,
   onRemove,
@@ -86,7 +88,13 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
                 {asset.driverName || 'Kierowca'}
               </span>
               <span className="text-xs text-gray-400">
-                #{asset.stats.carNumber} · {asset.stats.carBrand} · {asset.stats.classCategory}
+                {[
+                  showCarNumber ? `#${asset.stats.carNumber}` : null,
+                  asset.stats.carBrand,
+                  asset.stats.classCategory,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
             </div>
           </div>

@@ -30,6 +30,7 @@ const App: React.FC = () => {
   const [assets, setAssets] = useState<StreamAsset[]>([]);
   const [config, setConfig] = useState<GeneratorConfig>({
     style: RacingStyle.GTWC_BROADCAST,
+    showCarNumber: false,
   });
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const [includeTeamNameFromCsv, setIncludeTeamNameFromCsv] = useState(false);
@@ -226,6 +227,7 @@ const App: React.FC = () => {
         } else {
           delete stats.teamName;
         }
+        stats.showCarNumber = config.showCarNumber;
         const nameToRender =
           (assetsRef.current.find((a) => a.id === assetToProcess.id)?.driverName ??
             assetToProcess.driverName) || 'Kierowca';
@@ -422,6 +424,35 @@ const App: React.FC = () => {
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
+                checked={config.showCarNumber}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setConfig((prev) => ({ ...prev, showCarNumber: checked }));
+                  setAssets((prev) =>
+                    prev.map((a) =>
+                      a.status === GenerationStatus.SUCCESS
+                        ? {
+                            ...a,
+                            status: GenerationStatus.IDLE,
+                            generatedUrl: undefined,
+                            generatedName: undefined,
+                          }
+                        : a
+                    )
+                  );
+                }}
+                disabled={isProcessingQueue}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-900 text-twitch-500 focus:ring-twitch-500"
+              />
+              <span className="text-sm text-gray-400">Pokaż numer startowy na banerze</span>
+            </label>
+            <p className="text-xs text-gray-500">
+              W SimGrid gra często nadaje numery sama — bez tej opcji czerwone pole z numerem nie jest rysowane.
+            </p>
+
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
                 checked={includeTeamNameFromCsv}
                 onChange={(e) => setIncludeTeamNameFromCsv(e.target.checked)}
                 disabled={isProcessingQueue}
@@ -605,6 +636,7 @@ const App: React.FC = () => {
                   asset={asset}
                   logoBrands={logoBrands}
                   showTeamInput={includeTeamNameFromCsv}
+                  showCarNumber={config.showCarNumber}
                   onRetry={() => handleRegenerate(asset.id)}
                   onReset={handleResetAsset}
                   onRemove={removeAsset}

@@ -21,6 +21,7 @@ export interface OverlayStats {
   teamName?: string;
   countryCode?: string;
   brandDomain?: string;
+  showCarNumber?: boolean;
 }
 
 export interface StreamAsset {
@@ -39,6 +40,7 @@ export interface StreamAsset {
 
 export interface GeneratorConfig {
   style: RacingStyle;
+  showCarNumber: boolean;
 }
 
 export interface CsvColumnMap {
