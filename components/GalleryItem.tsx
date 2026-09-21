@@ -12,7 +12,6 @@ import type { LogoBrand } from '../services/logoCatalog';
 interface GalleryItemProps {
   asset: StreamAsset;
   logoBrands: LogoBrand[];
-  showTeamInput?: boolean;
   showCarNumber?: boolean;
   onRetry: (id: string) => void;
   onReset: (id: string) => void;
@@ -27,7 +26,6 @@ interface GalleryItemProps {
 export const GalleryItem: React.FC<GalleryItemProps> = ({
   asset,
   logoBrands,
-  showTeamInput,
   showCarNumber,
   onRetry,
   onReset,
@@ -44,6 +42,9 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
   const nameLocked = isGenerating;
   const nameDirty =
     isSuccess && (asset.driverName ?? '').trim() !== (asset.generatedName ?? '').trim();
+  const teamDirty =
+    isSuccess && (asset.teamName ?? '').trim() !== (asset.generatedTeam ?? '').trim();
+  const bannerDirty = nameDirty || teamDirty;
   const showNumberBadge =
     Boolean(showCarNumber) ||
     (asset.source === 'manual' && Boolean((asset.stats.carNumber ?? '').trim()));
@@ -134,7 +135,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
                     focus:outline-none focus:ring-1 focus:ring-twitch-500 focus:border-twitch-500
                     placeholder-gray-600 transition-colors
                     ${nameLocked ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-700'}
-                    ${nameDirty ? 'border-twitch-500/60' : ''}
+                    ${bannerDirty ? 'border-twitch-500/60' : ''}
                 `}
           />
         </div>
@@ -142,18 +143,18 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
           <button
             type="button"
             onClick={() => onSaveName(asset.id)}
-            disabled={nameLocked || !nameDirty}
+            disabled={nameLocked || !bannerDirty}
             className={`
               w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-semibold transition-colors
               ${
-                nameDirty
+                bannerDirty
                   ? 'bg-twitch-600 hover:bg-twitch-500 text-white'
                   : 'bg-gray-800 text-gray-500 cursor-not-allowed'
               }
             `}
           >
             <Save className="w-3 h-3" />
-            {nameDirty ? 'Zapisz i przerysuj baner' : 'Zapisane'}
+            {bannerDirty ? 'Zapisz i przerysuj baner' : 'Zapisane'}
           </button>
         )}
         <BrandPicker
@@ -163,7 +164,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
           onChange={(brand) => onUpdateBrand(asset.id, brand)}
           onUploadLogo={onUploadLogo}
         />
-        {showTeamInput && onUpdateTeam && (
+        {onUpdateTeam && (
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Users className="h-3 w-3 text-gray-500" />
@@ -172,9 +173,15 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               type="text"
               value={asset.teamName ?? ''}
               onChange={(e) => onUpdateTeam(asset.id, e.target.value)}
-              disabled={nameLocked || isSuccess}
-              placeholder="Nazwa teamu"
-              className="w-full bg-gray-900 text-sm text-white border border-gray-800 rounded-md py-2 pl-9 pr-2 focus:outline-none focus:ring-1 focus:ring-twitch-500 focus:border-twitch-500 placeholder-gray-600 hover:border-gray-700"
+              disabled={nameLocked}
+              placeholder="Nazwa teamu (pod nazwiskiem)"
+              className={`
+                w-full bg-gray-900 text-sm text-white border border-gray-800 rounded-md py-2 pl-9 pr-2
+                focus:outline-none focus:ring-1 focus:ring-twitch-500 focus:border-twitch-500
+                placeholder-gray-600 hover:border-gray-700
+                ${nameLocked ? 'opacity-50 cursor-not-allowed' : ''}
+                ${teamDirty ? 'border-twitch-500/60' : ''}
+              `}
             />
           </div>
         )}

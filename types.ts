@@ -24,6 +24,8 @@ export interface StreamAsset {
   driverName?: string;
   /** Name baked into the last generated banner (for dirty/save). */
   generatedName?: string;
+  /** Team name baked into the last generated banner (for dirty/save). */
+  generatedTeam?: string;
   carBrand?: string;
   generatedUrl?: string;
   status: GenerationStatus;

@@ -271,21 +271,18 @@ const renderCanvasOverlay = async (
   ctx.fillStyle = nameColor;
   ctx.font = "bold 40px 'Inter', sans-serif";
   ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
   const nameUpper = driverName ? driverName.toUpperCase() : 'DRIVER NAME';
-  const hasTeam = stats.teamName && stats.teamName.trim().length > 0;
-  if (hasTeam) {
-    ctx.font = "bold 36px 'Inter', sans-serif";
-    ctx.fillText(nameUpper, nameBarX + textOffsetX, bannerY + bannerHeight / 2 - 12);
-    ctx.font = "bold 20px 'Inter', sans-serif";
-    ctx.fillStyle = hexToRgba(nameColor, 0.85);
-    ctx.fillText(
-      stats.teamName!.trim().toUpperCase(),
-      nameBarX + textOffsetX,
-      bannerY + bannerHeight / 2 + 18
-    );
+  const teamLabel = (stats.teamName ?? '').trim();
+  if (teamLabel) {
+    ctx.font = "bold 32px 'Inter', sans-serif";
+    ctx.fillText(nameUpper, nameBarX + textOffsetX, bannerY + bannerHeight / 2 - 14);
+    ctx.font = "600 18px 'Inter', sans-serif";
+    ctx.fillStyle = hexToRgba(nameColor, 0.88);
+    ctx.fillText(teamLabel, nameBarX + textOffsetX, bannerY + bannerHeight / 2 + 18);
     ctx.fillStyle = nameColor;
   } else {
-    ctx.fillText(nameUpper, nameBarX + textOffsetX, bannerY + bannerHeight / 2 + 2);
+    ctx.fillText(nameUpper, nameBarX + textOffsetX, bannerY + bannerHeight / 2);
   }
 
   const classX = nameBarX + nameBarWidth;

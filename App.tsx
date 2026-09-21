@@ -28,6 +28,14 @@ import { Palette, Wand2, Trash2, Scissors, FileSpreadsheet, Download, Car } from
 import { BannerColorPicker } from './components/BannerColorPicker';
 import { ManualBannerForm, type ManualBannerEntry } from './components/ManualBannerForm';
 
+const isAssetDirty = (a: StreamAsset): boolean => {
+  if (a.status === GenerationStatus.IDLE || a.status === GenerationStatus.ERROR) return true;
+  if (a.status !== GenerationStatus.SUCCESS) return false;
+  const nameDirty = (a.driverName ?? '').trim() !== (a.generatedName ?? '').trim();
+  const teamDirty = (a.teamName ?? '').trim() !== (a.generatedTeam ?? '').trim();
+  return nameDirty || teamDirty;
+};
+
 const App: React.FC = () => {
   const [assets, setAssets] = useState<StreamAsset[]>([]);
   const [config, setConfig] = useState<GeneratorConfig>({
@@ -35,7 +43,6 @@ const App: React.FC = () => {
     colors: DEFAULT_BANNER_COLORS,
   });
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
-  const [includeTeamNameFromCsv, setIncludeTeamNameFromCsv] = useState(false);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [jsonFileName, setJsonFileName] = useState<string | null>(null);
   const [csvMap, setCsvMap] = useState<CsvColumnMap | null>(null);
@@ -147,7 +154,7 @@ const App: React.FC = () => {
             driverName,
             ...(wasGenerated
               ? {}
-              : { status: GenerationStatus.IDLE, generatedUrl: undefined, generatedName: undefined }),
+              : { status: GenerationStatus.IDLE, generatedUrl: undefined, generatedName: undefined, generatedTeam: undefined }),
           };
         })
       );
@@ -171,7 +178,7 @@ const App: React.FC = () => {
           carBrand,
           stats: { ...a.stats, carBrand: nextBrand || a.stats.carBrand || 'RACING' },
           ...(wasGenerated
-            ? { status: GenerationStatus.IDLE, generatedUrl: undefined, generatedName: undefined }
+            ? { status: GenerationStatus.IDLE, generatedUrl: undefined, generatedName: undefined, generatedTeam: undefined }
             : {}),
         };
       })
@@ -192,22 +199,21 @@ const App: React.FC = () => {
           status: GenerationStatus.IDLE,
           generatedUrl: undefined,
           generatedName: undefined,
+          generatedTeam: undefined,
         };
       })
     );
   }, []);
 
   const handleUpdateTeam = useCallback((id: string, teamName: string) => {
-    setAssets((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, teamName: teamName.trim() || undefined } : a))
-    );
+    setAssets((prev) => prev.map((a) => (a.id === id ? { ...a, teamName } : a)));
   }, []);
 
   const handleResetAsset = useCallback((id: string) => {
     setAssets((prev) =>
       prev.map((a) =>
         a.id === id
-          ? { ...a, status: GenerationStatus.IDLE, generatedUrl: undefined, generatedName: undefined, errorMessage: undefined }
+          ? { ...a, status: GenerationStatus.IDLE, generatedUrl: undefined, generatedName: undefined, generatedTeam: undefined, errorMessage: undefined }
           : a
       )
     );
@@ -237,7 +243,7 @@ const App: React.FC = () => {
           stats.carBrand = latest.carBrand.trim().toUpperCase();
         }
         const teamName = latest.teamName?.trim();
-        if (teamName && (includeTeamNameFromCsv || latest.source === 'manual')) {
+        if (teamName) {
           stats.teamName = teamName;
         } else {
           delete stats.teamName;
@@ -262,6 +268,7 @@ const App: React.FC = () => {
                   status: GenerationStatus.SUCCESS,
                   generatedUrl: generatedImage,
                   generatedName: nameToRender,
+                  generatedTeam: teamName || undefined,
                 }
               : a
           )
@@ -277,7 +284,7 @@ const App: React.FC = () => {
         );
       }
     },
-    [includeTeamNameFromCsv]
+    []
   );
 
   const handleAddManualBanner = useCallback(
@@ -348,13 +355,7 @@ const App: React.FC = () => {
 
   const handleGenerateAll = useCallback(async () => {
     setIsProcessingQueue(true);
-    const idleAssets = assets.filter((a) => {
-      if (a.status === GenerationStatus.IDLE || a.status === GenerationStatus.ERROR) return true;
-      if (a.status === GenerationStatus.SUCCESS) {
-        return (a.driverName ?? '').trim() !== (a.generatedName ?? '').trim();
-      }
-      return false;
-    });
+    const idleAssets = assets.filter(isAssetDirty);
 
     const BATCH_SIZE = 4;
 
@@ -379,13 +380,7 @@ const App: React.FC = () => {
     setCsvMap(null);
   };
 
-  const readyCount = assets.filter((a) => {
-    if (a.status === GenerationStatus.IDLE || a.status === GenerationStatus.ERROR) return true;
-    if (a.status === GenerationStatus.SUCCESS) {
-      return (a.driverName ?? '').trim() !== (a.generatedName ?? '').trim();
-    }
-    return false;
-  }).length;
+  const readyCount = assets.filter(isAssetDirty).length;
   const generatedCount = assets.filter(
     (a) => a.status === GenerationStatus.SUCCESS && a.generatedUrl
   ).length;
@@ -520,20 +515,6 @@ const App: React.FC = () => {
             </label>
             <p className="text-xs text-gray-500">
               W SimGrid gra często nadaje numery sama — bez tej opcji czerwone pole z numerem nie jest rysowane.
-            </p>
-
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={includeTeamNameFromCsv}
-                onChange={(e) => setIncludeTeamNameFromCsv(e.target.checked)}
-                disabled={isProcessingQueue}
-                className="w-4 h-4 rounded border-gray-600 bg-gray-900 text-twitch-500 focus:ring-twitch-500"
-              />
-              <span className="text-sm text-gray-400">Uwzględnij nazwę teamu na banerze</span>
-            </label>
-            <p className="text-xs text-gray-500">
-              Nazwę teamu wpisujesz ręcznie w karcie kierowcy (w CSV jej zwykle nie ma).
             </p>
           </div>
 
@@ -703,7 +684,6 @@ const App: React.FC = () => {
                 <GalleryItem
                   asset={asset}
                   logoBrands={logoBrands}
-                  showTeamInput={includeTeamNameFromCsv || asset.source === 'manual'}
                   showCarNumber={config.showCarNumber}
                   onRetry={() => handleRegenerate(asset.id)}
                   onReset={handleResetAsset}
